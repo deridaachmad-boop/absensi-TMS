@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Absensi Sederhana</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1d2330;--mut:#6b7385;--bd:#dde1e8;--pri:#2457d6;--sun:#eceff3;--need:#fff1d6;--S:#d9ecff;--I:#e4dcff;--A:#ffd9d9;--L:#d7f4dd;--warn:#b45309;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#14171d;--card:#1d222b;--tx:#e8ebf1;--mut:#9aa3b5;--bd:#333a47;--pri:#6f98ff;--sun:#262c37;--need:#4a3a15;--S:#1d3a57;--I:#35294f;--A:#512626;--L:#1f4a2b;--warn:#f0b35a}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#14171d;--card:#1d222b;--tx:#e8ebf1;--mut:#9aa3b5;--bd:#333a47;--pri:#6f98ff;--sun:#262c37;--need:#4a3a15;--S:#1d3a57;--I:#35294f;--A:#512626;--L:#1f4a2b;--warn:#f0b35a}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:1500px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--mut);margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button,select,input{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--bd);border-radius:7px;padding:7px 11px}
+button{cursor:pointer}button.pri{background:var(--pri);border-color:var(--pri);color:#fff}
+button:hover{filter:brightness(.95)}
+.sp{flex:1}
+.leg span{display:inline-block;padding:1px 7px;border-radius:5px;margin-right:6px;font-size:12px}
+.wrap{overflow-x:auto;border:1px solid var(--bd);border-radius:8px;max-width:100%}
+table{border-collapse:collapse;width:100%;font-size:11px}
+th,td{border:1px solid var(--bd);padding:2px 3px;text-align:center;white-space:nowrap}
+th{background:var(--sun);position:sticky;top:0}
+td.nm,th.nm{text-align:left;position:sticky;left:0;background:var(--card);min-width:150px;z-index:1;font-size:12px}
+th.nm{background:var(--sun)}
+.sun{background:var(--sun)}
+td.d{cursor:pointer;min-width:42px;height:34px}
+td.d:hover{outline:2px solid var(--pri);outline-offset:-2px}
+td.need{background:var(--need)}
+.t{display:block;color:var(--mut);font-size:10px;line-height:1.15}
+.t.w{color:var(--warn);font-weight:600}
+.b{display:block;font-weight:700;font-size:12px}
+.S{background:var(--S)}.I{background:var(--I)}.A{background:var(--A)}.L{background:var(--L)}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);padding:18px;width:min(92vw,340px)}
+dialog::backdrop{background:#0008}
+dialog label{display:block;margin:10px 0 3px;color:var(--mut);font-size:12px}
+dialog input,dialog select{width:100%}
+.msg{color:var(--mut);padding:30px;text-align:center}
+#pv{display:none}
+@media print{
+ @page{size:A4 landscape;margin:8mm}
+ body{background:#fff;color:#000}.noprint{display:none!important}#pv{display:block}
+ main{padding:0}.card{border:0;padding:0}.wrap{overflow:visible;border:0}
+ td.nm,th.nm,th{position:static}td.d{cursor:default}table{font-size:8px}
+ *{--card:#fff;--sun:#eee;--bd:#999;--tx:#000;--mut:#444;--need:#fff;--S:#cfe6ff;--I:#ddd3ff;--A:#ffcfcf;--L:#cdf1d4}
+}
+</style>
+</head>
+<body>
+<main>
+<div class="noprint">
+<h1>Absensi Sederhana</h1>
+<p class="sub">Unggah file tarikan ceklok (.xlsx), isi Sakit / Izin / Alpha / Lembur, lalu cetak atau ekspor CSV. Data tersimpan di browser ini.</p>
+<div class="card bar">
+ <input type="file" id="f" accept=".xlsx,.xls" hidden>
+ <button class="pri" id="up">Unggah data ceklok</button>
+ <select id="per" title="Periode tersimpan"></select>
+ <input id="q" placeholder="Cari nama / dept…" style="min-width:160px">
+ <span class="sp"></span>
+ <button id="alp" title="Hari kerja tanpa scan jadi Alpha">Kosong → Alpha</button>
+ <button id="c1">CSV detail</button>
+ <button id="c2">CSV rekap</button>
+ <button id="pr">Cetak</button>
+ <select id="sep" title="Pemisah CSV"><option value=";">CSV pemisah ;</option><option value=",">CSV pemisah ,</option></select>
+</div>
+<div class="card bar leg"><b>Keterangan:</b>
+ <span class="S">S = Sakit</span><span class="I">I = Izin</span><span class="A">A = Alpha</span><span class="L">L = Lembur (jam)</span>
+ <span style="background:var(--need)">Kuning = belum ada scan &amp; belum diisi</span>
+ <span style="color:var(--warn)">Jam oranye = scan hanya 1x</span>
+ <span class="sp"></span><span id="info" style="color:var(--mut)"></span>
+</div>
+</div>
+<div id="pv"><h2 id="pt" style="margin:0 0 6px"></h2></div>
+<div class="card"><div class="wrap" id="out"><div class="msg">Belum ada data. Klik “Unggah data ceklok”.</div></div></div>
+</main>
+
+<dialog id="dlg">
+ <b id="dh"></b>
+ <label>Status</label>
+ <select id="ds"><option value="">Hadir / tidak ada keterangan</option><option value="S">Sakit</option><option value="I">Izin</option><option value="A">Alpha</option></select>
+ <label>Lembur (jam, kosongkan jika tidak ada)</label>
+ <input id="do" type="number" min="0" step="0.5">
+ <label>Catatan</label>
+ <input id="dn" type="text">
+ <div class="bar" style="margin-top:14px"><button id="dx">Batal</button><span class="sp"></span><button id="dr">Hapus</button><button class="pri" id="dok">Simpan</button></div>
+</dialog>
+
+<script>
+const $=id=>document.getElementById(id);
+const BLN=["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+const HR=["Min","Sen","Sel","Rab","Kam","Jum","Sab"];
+let P=null,key=null,cur=null;
+
+function st(){try{return window.localStorage}catch(e){return null}}
+function save(){try{if(P&&key){st().setItem("absen:"+key,JSON.stringify(P));st().setItem("absen:last",key)}}catch(e){$("info").textContent="Peringatan: penyimpanan browser tidak tersedia."}}
+function periods(){const out=[];try{const s=st();for(let i=0;i<s.length;i++){const k=s.key(i);if(k.startsWith("absen:")&&k!=="absen:last")out.push(k.slice(6))}}catch(e){}return out.sort().reverse()}
+function load(k){try{const v=st().getItem("absen:"+k);if(v){P=JSON.parse(v);key=k;return true}}catch(e){}return false}
+function fillPer(){const l=periods();$("per").innerHTML=l.map(k=>{const[y,m]=k.split("-");return `<option value="${k}">${BLN[m-1]} ${y}</option>`}).join("")||"<option>(belum ada)</option>";if(key)$("per").value=key}
+
+function parse(ab){
+ const wb=XLSX.read(ab,{type:"array"});const a=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:false,defval:""});
+ let m=null;for(let i=0;i<6&&!m;i++)for(const c of a[i]||[])if(!m)m=String(c).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+ if(!m)throw new Error("Periode tidak ditemukan di baris atas file.");
+ const mo=+m[2],y=+m[3],emps=[];
+ for(let i=0;i<a.length;i++){
+  if(!/^no\s*:/i.test(String(a[i][0]).trim()))continue;
+  const c=a[i].filter(v=>String(v).trim()!=="");
+  const e={no:String(c[1]).trim(),nama:String(c[3]||"").trim(),dept:String(c[5]||"").trim(),days:{}};
+  const r=a[i+1]||[];
+  for(let d=0;d<31;d++){const t=String(r[d]||"").match(/\d{1,2}:\d{2}/g);if(t&&t.length)e.days[d+1]=t}
+  emps.push(e);
+ }
+ if(!emps.length)throw new Error("Data karyawan tidak ditemukan.");
+ return{y,m:mo,emps,ent:{}};
+}
+function ndays(){return new Date(P.y,P.m,0).getDate()}
+function dow(d){return new Date(P.y,P.m-1,d).getDay()}
+function ek(e,d){return e.no+"|"+d}
+
+function render(){
+ if(!P){return}
+ const n=ndays(),q=$("q").value.toLowerCase();
+ let h=`<table><thead><tr><th class="nm">Nama</th>`;
+ for(let d=1;d<=n;d++)h+=`<th class="${dow(d)==0?"sun":""}">${d}<br><small>${HR[dow(d)]}</small></th>`;
+ h+=`<th>Hadir</th><th>S</th><th>I</th><th>A</th><th>Lembur</th></tr></thead><tbody>`;
+ let need=0;
+ for(const e of P.emps){
+  if(q&&!(e.nama+" "+e.dept+" "+e.no).toLowerCase().includes(q))continue;
+  h+=`<tr><td class="nm"><b>${esc(e.nama)}</b><br><small>${esc(e.no)} · ${esc(e.dept)}</small></td>`;
+  for(let d=1;d<=n;d++){
+   const t=e.days[d],x=P.ent[ek(e,d)]||{},sun=dow(d)==0;
+   const nd=!t&&!x.st&&!x.ot&&!sun;if(nd)need++;
+   let c="d "+(sun?"sun ":"")+(nd?"need ":"")+(x.st||""),s="";
+   if(x.st)s+=`<span class="b">${x.st}</span>`;
+   if(x.ot)s+=`<span class="b L" style="border-radius:3px">L${x.ot}</span>`;
+   if(t)s+=t.length>1?`<span class="t">${t[0]}</span><span class="t">${t[t.length-1]}</span>`:`<span class="t w">${t[0]}</span>`;
+   h+=`<td class="${c}" data-e="${esc(e.no)}" data-d="${d}">${s}</td>`;
+  }
+  const r=rekap(e);
+  h+=`<td><b>${r.h}</b></td><td>${r.S||""}</td><td>${r.I||""}</td><td>${r.A||""}</td><td>${r.L||""}</td></tr>`;
+ }
+ $("out").innerHTML=h+"</tbody></table>";
+ $("info").textContent=`${P.emps.length} karyawan · ${need} hari belum diisi`;
+ $("pt").textContent=`Rekap Absensi ${BLN[P.m-1]} ${P.y}`;
+}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function rekap(e){
+ const r={h:0,S:0,I:0,A:0,L:0};
+ for(let d=1;d<=ndays();d++){const x=P.ent[ek(e,d)]||{};
+  if(x.st)r[x.st]++;else if(e.days[d])r.h++;
+  if(x.ot)r.L+=+x.ot}
+ return r;
+}
+
+/* dialog */
+$("out").addEventListener("click",ev=>{
+ const td=ev.target.closest("td.d");if(!td)return;
+ const e=P.emps.find(z=>z.no===td.dataset.e),d=+td.dataset.d,x=P.ent[ek(e,d)]||{};
+ cur={e,d};
+ $("dh").textContent=`${e.nama} — ${d} ${BLN[P.m-1]} ${P.y} (${HR[dow(d)]})`;
+ $("ds").value=x.st||"";$("do").value=x.ot||"";$("dn").value=x.note||"";
+ $("dlg").showModal();
+});
+$("dok").onclick=()=>{
+ const o={st:$("ds").value,ot:parseFloat($("do").value)||0,note:$("dn").value.trim()};
+ const k=ek(cur.e,cur.d);
+ if(!o.st&&!o.ot&&!o.note)delete P.ent[k];else P.ent[k]=o;
+ save();render();$("dlg").close();
+};
+$("dr").onclick=()=>{delete P.ent[ek(cur.e,cur.d)];save();render();$("dlg").close()};
+$("dx").onclick=()=>$("dlg").close();
+
+/* toolbar */
+$("up").onclick=()=>$("f").click();
+$("f").onchange=async ev=>{
+ const f=ev.target.files[0];if(!f)return;
+ try{
+  const np=parse(await f.arrayBuffer()),k=np.y+"-"+String(np.m).padStart(2,"0");
+  if(load(k)){
+   // gabungkan: data scan baru, keterangan lama dipertahankan
+   if(!confirm("Periode ini sudah ada. Perbarui data scan dan pertahankan isian S/I/A/Lembur yang sudah dibuat?"))return;
+   np.ent=P.ent;
+  }
+  P=np;key=k;save();fillPer();render();
+ }catch(err){alert("Gagal membaca file: "+err.message)}
+ ev.target.value="";
+};
+$("per").onchange=()=>{if(load($("per").value))render()};
+$("q").oninput=render;
+$("alp").onclick=()=>{
+ if(!P||!confirm("Tandai semua hari kerja (selain Minggu) tanpa scan dan tanpa keterangan sebagai Alpha?"))return;
+ for(const e of P.emps)for(let d=1;d<=ndays();d++)if(!e.days[d]&&dow(d)!=0&&!P.ent[ek(e,d)])P.ent[ek(e,d)]={st:"A",ot:0,note:""};
+ save();render();
+};
+$("pr").onclick=()=>{if(P)window.print()};
+
+/* CSV */
+function toCsv(rows){const s=$("sep").value;return "\ufeff"+rows.map(r=>r.map(v=>{v=String(v??"");return /["\n,;]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(s)).join("\r\n")}
+function dl(name,rows){
+ if(!P)return;
+ const b=new Blob([toCsv(rows)],{type:"text/csv;charset=utf-8"});
+ const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=name;
+ document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+const NS={S:"Sakit",I:"Izin",A:"Alpha"};
+$("c1").onclick=()=>{
+ if(!P)return;const rows=[["Tanggal","No","Nama","Departemen","Jam Masuk","Jam Pulang","Status","Lembur (jam)","Catatan"]];
+ for(const e of P.emps)for(let d=1;d<=ndays();d++){
+  const t=e.days[d]||[],x=P.ent[ek(e,d)]||{};
+  const tgl=`${P.y}-${String(P.m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  const status=x.st?NS[x.st]:t.length?"Hadir":dow(d)==0?"Libur":"";
+  rows.push([tgl,e.no,e.nama,e.dept,t[0]||"",t.length>1?t[t.length-1]:"",status,x.ot||"",x.note||""]);
+ }
+ dl(`absensi-detail-${key}.csv`,rows);
+};
+$("c2").onclick=()=>{
+ if(!P)return;const rows=[["No","Nama","Departemen","Hadir","Sakit","Izin","Alpha","Total Lembur (jam)"]];
+ for(const e of P.emps){const r=rekap(e);rows.push([e.no,e.nama,e.dept,r.h,r.S,r.I,r.A,r.L])}
+ dl(`absensi-rekap-${key}.csv`,rows);
+};
+
+/* init */
+fillPer();
+try{const l=st().getItem("absen:last");if(l&&load(l)){fillPer();render()}}catch(e){}
+</script>
+</body>
+</html>
